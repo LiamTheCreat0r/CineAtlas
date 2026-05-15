@@ -48,11 +48,26 @@ export function useSearch() {
   return { query, setQuery, results, loading }
 }
 
+async function fetchAllPopular(): Promise<{ id: number; title: string; poster_path: string | null }[]> {
+  const pages = 5
+  const all: { id: number; title: string; poster_path: string | null }[] = []
+  for (let p = 1; p <= pages; p++) {
+    const cacheKey = `popular:page${p}`
+    let page = getCached<{ id: number; title: string; poster_path: string | null }[]>(cacheKey)
+    if (!page) {
+      page = await getPopularMovies(p)
+      setCache(cacheKey, page)
+    }
+    all.push(...page)
+  }
+  return all
+}
+
 export async function fetchRandomStarter(): Promise<{ id: number; title: string; poster_path: string | null }> {
-  const cacheKey = 'popular:page1'
+  const cacheKey = 'popular:all'
   let movies = getCached<{ id: number; title: string; poster_path: string | null }[]>(cacheKey)
   if (!movies) {
-    movies = await getPopularMovies(1)
+    movies = await fetchAllPopular()
     setCache(cacheKey, movies)
   }
   const pool = movies.slice(0, POPULAR_FETCH_COUNT)

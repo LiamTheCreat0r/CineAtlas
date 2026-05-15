@@ -11,6 +11,8 @@ interface Props {
 
 export default function GraphMap({ nodes, edges, frozen }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
+  const prevLen = useRef(0)
+  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null)
 
   useEffect(() => {
     if (!svgRef.current) return
@@ -23,10 +25,13 @@ export default function GraphMap({ nodes, edges, frozen }: Props) {
 
     const g = svg.append('g')
 
+    let zoom: d3.ZoomBehavior<SVGSVGElement, unknown> | null = null
     if (!frozen) {
-      svg.call(d3.zoom<SVGSVGElement, unknown>().scaleExtent([0.1, 4]).on('zoom', (event) => {
+      zoom = d3.zoom<SVGSVGElement, unknown>().scaleExtent([0.1, 4]).on('zoom', (event) => {
         g.attr('transform', event.transform)
-      }) as any)
+      }) 
+      svg.call(zoom)
+      zoomRef.current = zoom
     }
 
     const simulation = d3.forceSimulation(nodes)
@@ -68,7 +73,7 @@ export default function GraphMap({ nodes, edges, frozen }: Props) {
         .data((d: any) => [d])
         .join('image')
         .attr('href', (d: any) => {
-          const path = d.type === 'film' ? d.posterPath : null
+          const path = d.type === 'film' ? d.posterPath : d.profilePath
           return path ? `${TMDB_IMAGE_BASE}${path}` : ''
         })
         .attr('width', (d: any) => d.type === 'film' ? 50 : 40)
@@ -120,6 +125,25 @@ export default function GraphMap({ nodes, edges, frozen }: Props) {
       simulation.stop()
     }
   }, [nodes, edges, frozen])
+
+  useEffect(() => {
+    if (frozen || !zoomRef.current || nodes.length === 0) return
+    if (nodes.length === prevLen.current) return
+    prevLen.current = nodes.length
+
+    const last = nodes[nodes.length - 1]
+    const svgEl = svgRef.current
+    if (!svgEl) return
+
+    requestAnimationFrame(() => {
+      if (last.x == null || last.y == null) return
+      const width = svgEl.clientWidth
+      const height = svgEl.clientHeight
+      const svg = d3.select(svgEl)
+      const t = d3.zoomIdentity.translate(width / 2 - last.x, height / 2 - last.y)
+      svg.transition().duration(400).call(zoomRef.current!.transform as any, t)
+    })
+  }, [nodes.length, frozen])
 
   return (
     <svg ref={svgRef} className="w-full h-full bg-neutral-950" />

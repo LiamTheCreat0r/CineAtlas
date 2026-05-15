@@ -7,14 +7,17 @@ import { fetchRandomStarter } from '../hooks/useTMDB'
 import { validateGuess } from '../utils/validation'
 import type { GraphNode, GraphEdge, TMDBMultiResult } from '../types'
 
+const GUESS_POINTS = 20
+
 interface Props {
-  onEnd: (nodes: GraphNode[], edges: GraphEdge[], longestStreak: number, timeSurvived: number) => void
+  onEnd: (nodes: GraphNode[], edges: GraphEdge[], longestStreak: number, timeSurvived: number, score: number) => void
 }
 
 export default function Game({ onEnd }: Props) {
   const [nodes, setNodes] = useState<GraphNode[]>([])
   const [edges, setEdges] = useState<GraphEdge[]>([])
   const [longestStreak, setLongestStreak] = useState(0)
+  const [score, setScore] = useState(0)
   const [ready, setReady] = useState(false)
   const { timeLeft, isExpired, start, addTime } = useTimer()
   const timerStarted = useRef(false)
@@ -30,6 +33,7 @@ export default function Game({ onEnd }: Props) {
         label: movie.title,
         tmdbId: movie.id,
         posterPath: movie.poster_path,
+        profilePath: null,
       }
       setNodes([starter])
       startTimeRef.current = Date.now()
@@ -48,9 +52,9 @@ export default function Game({ onEnd }: Props) {
     if (isExpired && !ended.current) {
       ended.current = true
       const timeSurvived = Math.round((Date.now() - startTimeRef.current) / 1000)
-      onEnd(nodes, edges, longestStreak, timeSurvived)
+      onEnd(nodes, edges, longestStreak, timeSurvived, score)
     }
-  }, [isExpired, nodes, edges, longestStreak, onEnd])
+  }, [isExpired, nodes, edges, longestStreak, score, onEnd])
 
   const filmNodes = nodes.filter(n => n.type === 'film')
   const actorNodes = nodes.filter(n => n.type === 'actor')
@@ -62,6 +66,7 @@ export default function Game({ onEnd }: Props) {
       label: result.media_type === 'movie' ? result.title! : result.name!,
       tmdbId: result.id,
       posterPath: result.media_type === 'movie' ? result.poster_path! : null,
+      profilePath: result.media_type === 'person' ? result.profile_path! : null,
     }
     if (nodes.some(n => n.tmdbId === candidate.tmdbId)) {
       streakRef.current = 0
@@ -80,7 +85,8 @@ export default function Game({ onEnd }: Props) {
     setEdges(prev => [...prev, ...newEdges])
     streakRef.current += 1
     setLongestStreak(l => Math.max(l, streakRef.current))
-    addTime(candidate.type, nodes.length + 1)
+    setScore(prev => prev + GUESS_POINTS)
+    addTime(candidate.type)
     return true
   }
 
@@ -95,6 +101,9 @@ export default function Game({ onEnd }: Props) {
   return (
     <div className="relative w-full h-full bg-neutral-950 flex flex-col">
       <TimerBar timeLeft={timeLeft} />
+      <div className="absolute top-3 right-4 z-50">
+        <span className="text-white font-mono font-bold text-lg">{score}</span>
+      </div>
       <div className="flex-1 relative">
         <GraphMap nodes={nodes} edges={edges} />
       </div>

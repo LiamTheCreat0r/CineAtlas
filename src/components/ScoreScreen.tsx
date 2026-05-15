@@ -7,10 +7,11 @@ interface Props {
   edges: GraphEdge[]
   longestStreak: number
   timeSurvived: number
+  score: number
   onRestart: () => void
 }
 
-export default function ScoreScreen({ nodes, edges, longestStreak, timeSurvived, onRestart }: Props) {
+export default function ScoreScreen({ nodes, edges, longestStreak, timeSurvived, score, onRestart }: Props) {
   return (
     <div className="relative w-full h-full bg-neutral-950 flex flex-col">
       <div className="flex-1 relative">
@@ -22,6 +23,7 @@ export default function ScoreScreen({ nodes, edges, longestStreak, timeSurvived,
             nodes={nodes.length}
             longestStreak={longestStreak}
             timeSurvived={timeSurvived}
+            score={score}
           />
         </div>
         <button

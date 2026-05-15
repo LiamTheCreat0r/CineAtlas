@@ -6,6 +6,7 @@ export interface GraphNode {
   label: string
   tmdbId: number
   posterPath: string | null
+  profilePath: string | null
   x?: number
   y?: number
   fx?: number | null
