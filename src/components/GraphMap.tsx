@@ -9,10 +9,12 @@ interface Props {
   frozen?: boolean
 }
 
+const ZOOM_TICK = 30
+
 export default function GraphMap({ nodes, edges, frozen }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const prevLen = useRef(0)
-  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null)
+  const savedPos = useRef<Map<string, { x: number; y: number }>>(new Map())
 
   useEffect(() => {
     if (!svgRef.current) return
@@ -25,13 +27,31 @@ export default function GraphMap({ nodes, edges, frozen }: Props) {
 
     const g = svg.append('g')
 
-    let zoom: d3.ZoomBehavior<SVGSVGElement, unknown> | null = null
+    const zoom = d3.zoom<SVGSVGElement, unknown>().scaleExtent([0.1, 4]).on('zoom', (event) => {
+      g.attr('transform', event.transform)
+    })
     if (!frozen) {
-      zoom = d3.zoom<SVGSVGElement, unknown>().scaleExtent([0.1, 4]).on('zoom', (event) => {
-        g.attr('transform', event.transform)
-      }) 
       svg.call(zoom)
-      zoomRef.current = zoom
+    }
+
+    const restored = savedPos.current
+    const newNodeAdded = nodes.length > prevLen.current
+    nodes.forEach(n => {
+      const saved = restored.get(n.id)
+      if (saved) {
+        n.x = saved.x
+        n.y = saved.y
+      } else {
+        n.x = width / 2 + (Math.random() - 0.5) * 60
+        n.y = height / 2 + (Math.random() - 0.5) * 60
+      }
+    })
+    prevLen.current = nodes.length
+
+    if (!frozen) {
+      const first = nodes[0]
+      const t = d3.zoomIdentity.translate(width / 2, height / 2).scale(1.4).translate(-first.x!, -first.y!)
+      svg.call(zoom.transform, t)
     }
 
     const simulation = d3.forceSimulation(nodes)
@@ -43,7 +63,12 @@ export default function GraphMap({ nodes, edges, frozen }: Props) {
     const linkGroup = g.append('g')
     const nodeGroup = g.append('g')
 
+    let tickCount = 0
+    let zoomed = !newNodeAdded || nodes.length <= 1
+
     function tick() {
+      tickCount++
+
       linkGroup.selectAll<SVGLineElement, any>('line')
         .data(edges)
         .join('line')
@@ -117,33 +142,30 @@ export default function GraphMap({ nodes, edges, frozen }: Props) {
             d.fy = null
           }) as any)
       }
+
+      if (!zoomed && tickCount >= ZOOM_TICK) {
+        zoomed = true
+        const last = nodes[nodes.length - 1]
+        if (last.x != null && last.y != null && !frozen) {
+          const t = d3.zoomIdentity.translate(width / 2, height / 2).scale(1.4).translate(-last.x, -last.y)
+          svg.transition().duration(400).call(zoom.transform as any, t)
+        }
+      }
     }
 
     simulation.on('tick', tick)
 
     return () => {
+      const pos = new Map<string, { x: number; y: number }>()
+      nodes.forEach(n => {
+        if (n.x != null && n.y != null) {
+          pos.set(n.id, { x: n.x, y: n.y })
+        }
+      })
+      savedPos.current = pos
       simulation.stop()
     }
   }, [nodes, edges, frozen])
-
-  useEffect(() => {
-    if (frozen || !zoomRef.current || nodes.length === 0) return
-    if (nodes.length === prevLen.current) return
-    prevLen.current = nodes.length
-
-    const last = nodes[nodes.length - 1]
-    const svgEl = svgRef.current
-    if (!svgEl) return
-
-    requestAnimationFrame(() => {
-      if (last.x == null || last.y == null) return
-      const width = svgEl.clientWidth
-      const height = svgEl.clientHeight
-      const svg = d3.select(svgEl)
-      const t = d3.zoomIdentity.translate(width / 2 - last.x, height / 2 - last.y)
-      svg.transition().duration(400).call(zoomRef.current!.transform as any, t)
-    })
-  }, [nodes.length, frozen])
 
   return (
     <svg ref={svgRef} className="w-full h-full bg-neutral-950" />

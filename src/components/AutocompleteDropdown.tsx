@@ -10,14 +10,14 @@ interface Props {
 export default function AutocompleteDropdown({ results, loading, onSelect }: Props) {
   if (results.length === 0 && !loading) return null
   return (
-    <ul className="absolute bottom-full left-0 right-0 mb-1 bg-neutral-800 border border-neutral-700 rounded-lg max-h-64 overflow-y-auto z-50 shadow-xl">
+    <ul className="absolute bottom-full left-0 right-0 mb-1 bg-neutral-800 border border-neutral-700 rounded-lg max-h-64 overflow-y-auto z-50 shadow-xl select-none">
       {loading && (
-        <li className="px-4 py-2 text-neutral-400 text-sm">Searching…</li>
+        <li className="px-4 py-2 text-neutral-400 text-sm cursor-default">Searching…</li>
       )}
       {results.map(r => (
         <li
           key={`${r.media_type}-${r.id}`}
-          onClick={() => onSelect(r)}
+          onMouseDown={e => { e.preventDefault(); onSelect(r) }}
           className="flex items-center gap-3 px-4 py-2 hover:bg-neutral-700 cursor-pointer transition-colors"
         >
           <img

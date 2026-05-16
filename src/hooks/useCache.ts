@@ -28,3 +28,27 @@ export function setCache<T>(key: string, data: T): void {
     /* storage full */
   }
 }
+
+const inFlight = new Map<string, Promise<unknown>>()
+
+export async function fetchOrWait<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  const cached = getCached<T>(key)
+  if (cached) return cached
+
+  const existing = inFlight.get(key) as Promise<T> | undefined
+  if (existing) return existing
+
+  const promise = fetcher()
+    .then(data => {
+      setCache(key, data)
+      inFlight.delete(key)
+      return data
+    })
+    .catch(err => {
+      inFlight.delete(key)
+      throw err
+    })
+
+  inFlight.set(key, promise)
+  return promise
+}

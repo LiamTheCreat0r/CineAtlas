@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { searchMulti, getPopularMovies } from '../services/tmdbApi'
+import { searchMulti, getTopMovies } from '../services/tmdbApi'
 import { getCached, setCache } from './useCache'
 import type { TMDBMultiResult } from '../types'
 import { POPULAR_FETCH_COUNT } from '../constants'
@@ -34,7 +34,9 @@ export function useSearch() {
           name: d.name,
           poster_path: d.poster_path ?? null,
           profile_path: d.profile_path ?? null,
+          popularity: (d as any).popularity ?? 0,
         }))
+        mapped.sort((a, b) => b.popularity - a.popularity)
         setCache(cacheKey, mapped)
         setResults(mapped)
       } catch {
@@ -48,14 +50,14 @@ export function useSearch() {
   return { query, setQuery, results, loading }
 }
 
-async function fetchAllPopular(): Promise<{ id: number; title: string; poster_path: string | null }[]> {
+async function fetchAllTopMovies(): Promise<{ id: number; title: string; poster_path: string | null }[]> {
   const pages = 5
   const all: { id: number; title: string; poster_path: string | null }[] = []
   for (let p = 1; p <= pages; p++) {
-    const cacheKey = `popular:page${p}`
+    const cacheKey = `top:page${p}`
     let page = getCached<{ id: number; title: string; poster_path: string | null }[]>(cacheKey)
     if (!page) {
-      page = await getPopularMovies(p)
+      page = await getTopMovies(p)
       setCache(cacheKey, page)
     }
     all.push(...page)
@@ -64,10 +66,10 @@ async function fetchAllPopular(): Promise<{ id: number; title: string; poster_pa
 }
 
 export async function fetchRandomStarter(): Promise<{ id: number; title: string; poster_path: string | null }> {
-  const cacheKey = 'popular:all'
+  const cacheKey = 'top:all'
   let movies = getCached<{ id: number; title: string; poster_path: string | null }[]>(cacheKey)
   if (!movies) {
-    movies = await fetchAllPopular()
+    movies = await fetchAllTopMovies()
     setCache(cacheKey, movies)
   }
   const pool = movies.slice(0, POPULAR_FETCH_COUNT)

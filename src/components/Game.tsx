@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import TimerBar from './TimerBar'
+import StreakBar from './StreakBar'
 import GraphMap from './GraphMap'
 import InputBar from './InputBar'
 import { useTimer } from '../hooks/useTimer'
 import { fetchRandomStarter } from '../hooks/useTMDB'
-import { validateGuess } from '../utils/validation'
+import { validateGuess, preloadNodeCredits } from '../utils/validation'
 import type { GraphNode, GraphEdge, TMDBMultiResult } from '../types'
 
 const GUESS_POINTS = 20
@@ -20,10 +21,13 @@ export default function Game({ onEnd }: Props) {
   const [score, setScore] = useState(0)
   const [ready, setReady] = useState(false)
   const { timeLeft, isExpired, start, addTime } = useTimer()
+  const [streakTimeLeft, setStreakTimeLeft] = useState(0)
+  const streakRef = useRef(0)
+  const multiplier = 1 + 0.25 * streakRef.current
   const timerStarted = useRef(false)
   const ended = useRef(false)
   const startTimeRef = useRef(0)
-  const streakRef = useRef(0)
+  const streakTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
 
   useEffect(() => {
     fetchRandomStarter().then(movie => {
@@ -36,6 +40,7 @@ export default function Game({ onEnd }: Props) {
         profilePath: null,
       }
       setNodes([starter])
+      preloadNodeCredits(starter)
       startTimeRef.current = Date.now()
       setReady(true)
     })
@@ -56,6 +61,32 @@ export default function Game({ onEnd }: Props) {
     }
   }, [isExpired, nodes, edges, longestStreak, score, onEnd])
 
+  function startStreakTimer() {
+    clearInterval(streakTimerRef.current)
+    setStreakTimeLeft(10)
+    streakTimerRef.current = setInterval(() => {
+      setStreakTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(streakTimerRef.current)
+          setStreakTimeLeft(0)
+          streakRef.current = 0
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  function resetStreak() {
+    streakRef.current = 0
+    clearInterval(streakTimerRef.current)
+    setStreakTimeLeft(0)
+  }
+
+  useEffect(() => {
+    return () => clearInterval(streakTimerRef.current)
+  }, [])
+
   const filmNodes = nodes.filter(n => n.type === 'film')
   const actorNodes = nodes.filter(n => n.type === 'actor')
 
@@ -69,15 +100,16 @@ export default function Game({ onEnd }: Props) {
       profilePath: result.media_type === 'person' ? result.profile_path! : null,
     }
     if (nodes.some(n => n.tmdbId === candidate.tmdbId)) {
-      streakRef.current = 0
+      resetStreak()
       return false
     }
     const connectedTo = await validateGuess(candidate, filmNodes, actorNodes)
     if (connectedTo.length === 0) {
-      streakRef.current = 0
+      resetStreak()
       return false
     }
     setNodes(prev => [...prev, candidate])
+    preloadNodeCredits(candidate)
     const newEdges: GraphEdge[] = connectedTo.map(ct => ({
       source: ct.id,
       target: candidate.id,
@@ -85,8 +117,10 @@ export default function Game({ onEnd }: Props) {
     setEdges(prev => [...prev, ...newEdges])
     streakRef.current += 1
     setLongestStreak(l => Math.max(l, streakRef.current))
-    setScore(prev => prev + GUESS_POINTS)
+    const currentMultiplier = 1 + 0.25 * streakRef.current
+    setScore(prev => prev + Math.round(GUESS_POINTS * currentMultiplier))
     addTime(candidate.type)
+    startStreakTimer()
     return true
   }
 
@@ -101,8 +135,16 @@ export default function Game({ onEnd }: Props) {
   return (
     <div className="relative w-full h-full bg-neutral-950 flex flex-col">
       <TimerBar timeLeft={timeLeft} />
+      <StreakBar streakTimeLeft={streakTimeLeft} multiplier={multiplier} streak={streakRef.current} />
       <div className="absolute top-3 right-4 z-50">
-        <span className="text-white font-mono font-bold text-lg">{score}</span>
+        <span className="text-white font-mono font-bold text-lg">
+          {score}
+          {streakTimeLeft > 0 && (
+            <span className="text-cyan-400 text-sm ml-1">
+              ({multiplier.toFixed(2)}x)
+            </span>
+          )}
+        </span>
       </div>
       <div className="flex-1 relative">
         <GraphMap nodes={nodes} edges={edges} />

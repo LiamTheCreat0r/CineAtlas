@@ -37,6 +37,7 @@ export interface TMDBMultiResult {
   name?: string
   poster_path?: string | null
   profile_path?: string | null
+  popularity: number
 }
 
 export interface TMDBMovieCredit {

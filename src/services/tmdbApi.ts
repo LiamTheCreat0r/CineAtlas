@@ -35,3 +35,9 @@ export async function getPopularMovies(page = 1) {
   const data = await fetchJSON<{ results: { id: number; title: string; poster_path: string | null }[] }>(url)
   return data.results
 }
+
+export async function getTopMovies(page = 1) {
+  const url = `${BASE}/discover/movie?sort_by=vote_count.desc&api_key=${apiKey()}&language=en-US&page=${page}`
+  const data = await fetchJSON<{ results: { id: number; title: string; poster_path: string | null }[] }>(url)
+  return data.results
+}

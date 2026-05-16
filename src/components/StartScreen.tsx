@@ -1,7 +1,9 @@
+import SettingsPanel from './SettingsPanel'
+
 export default function StartScreen({ onStart }: { onStart: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center h-full bg-neutral-950 text-white gap-6">
-      <h1 className="text-5xl font-bold tracking-tight">CINEATLAS</h1>
+      <h1 className="text-5xl font-bold tracking-tight">CINE<span className="text-red-600">ATLAS</span></h1>
       <p className="text-neutral-400 text-lg max-w-md text-center leading-relaxed">
         Build a film knowledge graph under time pressure.<br />
         Name actors and films connected to anything on your map.
@@ -12,6 +14,7 @@ export default function StartScreen({ onStart }: { onStart: () => void }) {
       >
         Start
       </button>
+      <SettingsPanel />
     </div>
   )
 }
